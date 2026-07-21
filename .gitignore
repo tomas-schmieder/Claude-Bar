@@ -1,0 +1,8 @@
+.build/
+.swiftpm/
+ClaudeBar.app/
+*.xcuserdata/
+.DS_Store
+# Extra safety
+DerivedData/
+*.xcuserdata/

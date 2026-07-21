@@ -1,7 +1,7 @@
 import AppKit
 
-/// Claude-only dual-bar menu-bar icon (session top / weekly bottom), matching CodexBar’s
-/// monochrome template “crab” geometry without the multi-provider twists.
+/// Claude-only dual-bar menu-bar icon (session top / weekly bottom).
+/// Supports Claude “crab” notches or plain bars via `MenuBarIconStyle`.
 enum IconRenderer {
     private static let outputSize = NSSize(width: 18, height: 18)
     private static let outputScale: CGFloat = 2
@@ -38,7 +38,8 @@ enum IconRenderer {
     static func makeClaudeIcon(
         sessionRemaining: Double?,
         weeklyRemaining: Double?,
-        stale: Bool = false) -> NSImage
+        stale: Bool = false,
+        style: MenuBarIconStyle = MenuBarIconStylePreference.current) -> NSImage
     {
         self.renderImage {
             let baseFill = NSColor.labelColor
@@ -48,42 +49,61 @@ enum IconRenderer {
 
             let barWidthPx = 30
             let barXPx = (Self.canvasPx - barWidthPx) / 2
-            let topRectPx = RectPx(x: barXPx, y: 19, w: barWidthPx, h: 12)
-            let bottomRectPx = RectPx(x: barXPx, y: 5, w: barWidthPx, h: 8)
 
-            let effectiveWeekly: Double? = {
-                guard let weeklyRemaining else { return nil }
-                return weeklyRemaining <= 0 ? nil : weeklyRemaining
-            }()
-
-            self.drawBar(
-                rectPx: topRectPx,
-                remaining: sessionRemaining,
-                baseFill: baseFill,
-                fillColor: fillColor,
-                trackFillAlpha: trackFillAlpha,
-                trackStrokeAlpha: trackStrokeAlpha,
-                addNotches: true)
-
-            if let effectiveWeekly {
+            switch style {
+            case .claudeOnly:
+                // Center a single Claude face; session remaining fills the body.
+                let bodyHeightPx = 14
+                let legHeightPx = 3
+                let bodyYPx = (Self.canvasPx - (bodyHeightPx + legHeightPx)) / 2 + legHeightPx
+                let faceRectPx = RectPx(x: barXPx, y: bodyYPx, w: barWidthPx, h: bodyHeightPx)
                 self.drawBar(
-                    rectPx: bottomRectPx,
-                    remaining: effectiveWeekly,
+                    rectPx: faceRectPx,
+                    remaining: sessionRemaining,
                     baseFill: baseFill,
                     fillColor: fillColor,
                     trackFillAlpha: trackFillAlpha,
                     trackStrokeAlpha: trackStrokeAlpha,
-                    addNotches: false)
-            } else {
+                    addNotches: true)
+
+            case .claudeAndBar, .barsOnly:
+                let topRectPx = RectPx(x: barXPx, y: 19, w: barWidthPx, h: 12)
+                let bottomRectPx = RectPx(x: barXPx, y: 5, w: barWidthPx, h: 8)
+
+                let effectiveWeekly: Double? = {
+                    guard let weeklyRemaining else { return nil }
+                    return weeklyRemaining <= 0 ? nil : weeklyRemaining
+                }()
+
                 self.drawBar(
-                    rectPx: bottomRectPx,
-                    remaining: nil,
-                    alpha: 0.45,
+                    rectPx: topRectPx,
+                    remaining: sessionRemaining,
                     baseFill: baseFill,
                     fillColor: fillColor,
                     trackFillAlpha: trackFillAlpha,
                     trackStrokeAlpha: trackStrokeAlpha,
-                    addNotches: false)
+                    addNotches: style == .claudeAndBar)
+
+                if let effectiveWeekly {
+                    self.drawBar(
+                        rectPx: bottomRectPx,
+                        remaining: effectiveWeekly,
+                        baseFill: baseFill,
+                        fillColor: fillColor,
+                        trackFillAlpha: trackFillAlpha,
+                        trackStrokeAlpha: trackStrokeAlpha,
+                        addNotches: false)
+                } else {
+                    self.drawBar(
+                        rectPx: bottomRectPx,
+                        remaining: nil,
+                        alpha: 0.45,
+                        baseFill: baseFill,
+                        fillColor: fillColor,
+                        trackFillAlpha: trackFillAlpha,
+                        trackStrokeAlpha: trackStrokeAlpha,
+                        addNotches: false)
+                }
             }
         }
     }

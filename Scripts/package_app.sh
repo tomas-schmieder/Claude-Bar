@@ -70,6 +70,8 @@ cat > "$APP_STAGE/Contents/Info.plist" <<PLIST
     <true/>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>NSHumanReadableCopyright</key>
     <string>Copyright © ClaudeBar contributors</string>
 </dict>
@@ -82,6 +84,14 @@ printf 'APPL????' > "$APP_STAGE/Contents/PkgInfo"
 echo "==> Installing binary"
 cp "$BINARY" "$APP_STAGE/Contents/MacOS/ClaudeBar"
 chmod +x "$APP_STAGE/Contents/MacOS/ClaudeBar"
+
+ICON_ICNS="$ROOT/Resources/AppIcon.icns"
+if [[ -f "$ICON_ICNS" ]]; then
+  echo "==> Installing app icon"
+  cp "$ICON_ICNS" "$APP_STAGE/Contents/Resources/AppIcon.icns"
+else
+  echo "WARNING: missing $ICON_ICNS — app will use the default icon" >&2
+fi
 
 # Ad-hoc sign so Gatekeeper will launch a locally built app.
 echo "==> Codesigning (adhoc)"

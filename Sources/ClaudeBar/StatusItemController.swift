@@ -13,6 +13,7 @@ final class StatusItemController {
     private var costTask: Task<Void, Never>?
     private var timerTask: Task<Void, Never>?
     private var keepCLISessionsAlive = false
+    private var isIconStale = false
 
     private let cardWidth: CGFloat = 300
     private let refreshInterval: Duration = .seconds(5 * 60)
@@ -72,6 +73,15 @@ final class StatusItemController {
 
     @objc func openBilling(_ sender: Any?) {
         self.openURL("https://console.anthropic.com/settings/billing")
+    }
+
+    @objc func selectMenuBarIconStyle(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String,
+              let style = MenuBarIconStyle(rawValue: raw)
+        else { return }
+        MenuBarIconStylePreference.set(style)
+        self.reapplyCurrentIcon()
+        self.rebuildMenu()
     }
 
     private func openURL(_ string: String) {
@@ -167,6 +177,7 @@ final class StatusItemController {
     }
 
     private func applyPlaceholderIcon(stale: Bool = false) {
+        self.isIconStale = stale
         self.statusItem.button?.image = IconRenderer.makeClaudeIcon(
             sessionRemaining: nil,
             weeklyRemaining: nil,
@@ -175,6 +186,7 @@ final class StatusItemController {
     }
 
     private func applyIcon(from snapshot: ClaudeUsageSnapshot, stale: Bool = false) {
+        self.isIconStale = stale
         self.statusItem.button?.image = IconRenderer.makeClaudeIcon(
             sessionRemaining: snapshot.primary.remainingPercent,
             weeklyRemaining: snapshot.secondary?.remainingPercent,
@@ -188,6 +200,14 @@ final class StatusItemController {
                 "Claude · Session \(session)% left · Weekly \(weeklyLeft)% left"
         } else {
             self.statusItem.button?.toolTip = "Claude · Session \(session)% left"
+        }
+    }
+
+    private func reapplyCurrentIcon() {
+        if let snapshot = self.snapshot {
+            self.applyIcon(from: snapshot, stale: self.isIconStale)
+        } else {
+            self.applyPlaceholderIcon(stale: self.isIconStale)
         }
     }
 
@@ -208,6 +228,7 @@ final class StatusItemController {
             menu.addItem(item)
         }
 
+        menu.addItem(self.makeMenuBarIconStyleItem())
         menu.addItem(.separator())
 
         let refresh = NSMenuItem(
@@ -227,6 +248,26 @@ final class StatusItemController {
         menu.addItem(quit)
 
         self.statusItem.menu = menu
+    }
+
+    private func makeMenuBarIconStyleItem() -> NSMenuItem {
+        let item = NSMenuItem(title: "Menu Bar Icon", action: nil, keyEquivalent: "")
+        let submenu = NSMenu()
+        let current = MenuBarIconStylePreference.current
+        for style in MenuBarIconStyle.allCases {
+            let styleItem = NSMenuItem(
+                title: style.menuTitle,
+                action: #selector(selectMenuBarIconStyle(_:)),
+                keyEquivalent: "")
+            styleItem.target = self
+            styleItem.representedObject = style.rawValue
+            styleItem.state = style == current ? .on : .off
+            styleItem.isEnabled = true
+            submenu.addItem(styleItem)
+        }
+        item.submenu = submenu
+        item.isEnabled = true
+        return item
     }
 
     private func makeCardItem() -> NSMenuItem {

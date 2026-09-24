@@ -45,8 +45,75 @@ enum ClaudeBarDebugMain {
                 print("cost: unavailable")
             }
         } catch {
-            fputs("error: \(error.localizedDescription)\n", stderr)
-            exit(1)
+            fputs("claude error: \(error.localizedDescription)\n", stderr)
+        }
+
+        await self.debugCodex()
+        await self.debugCursor()
+    }
+
+    private static func debugCodex() async {
+        print("\nClaudeBarDebug: fetching Codex usage…")
+        do {
+            let limits = try await CodexUsageClient().fetchLimits()
+            self.printLimits(limits)
+        } catch {
+            fputs("codex limits error: \(error.localizedDescription)\n", stderr)
+        }
+        do {
+            let local = try CodexSessionLogScanner().scan()
+            self.printHistory(local.history)
+            if let limits = local.limits {
+                print("limits from local logs:")
+                self.printLimits(limits)
+            }
+        } catch {
+            fputs("codex history error: \(error.localizedDescription)\n", stderr)
+        }
+    }
+
+    private static func debugCursor() async {
+        print("\nClaudeBarDebug: fetching Cursor usage…")
+        let client = CursorUsageClient()
+        do {
+            let limits = try await client.fetchLimits()
+            self.printLimits(limits)
+        } catch {
+            fputs("cursor limits error: \(error.localizedDescription)\n", stderr)
+        }
+        do {
+            let history = try await client.fetchHistory()
+            self.printHistory(history)
+        } catch {
+            fputs("cursor history error: \(error.localizedDescription)\n", stderr)
+        }
+    }
+
+    private static func printLimits(_ limits: ProviderLimitSnapshot) {
+        if let email = limits.accountEmail {
+            print("account: \(email)")
+        }
+        if let plan = limits.planName {
+            print("plan:    \(plan)")
+        }
+        for named in limits.windows {
+            print("  - \(named.title): \(format(named.window))")
+        }
+        for note in limits.notes {
+            print("  \(note)")
+        }
+    }
+
+    private static func printHistory(_ history: TokenUsageHistory) {
+        let today = history.summary(last: 1)
+        let month = history.summary(last: 30)
+        print("source:  \(history.sourceDescription)")
+        print("today:   \(UsageFormatter.tokenCountString(today.totalTokens)) tokens, "
+            + (today.costUSD.map { UsageFormatter.usdString($0) } ?? "cost n/a"))
+        print("30d:     \(UsageFormatter.tokenCountString(month.totalTokens)) tokens, "
+            + (month.costUSD.map { UsageFormatter.usdString($0) } ?? "cost n/a"))
+        if let top = month.topModel {
+            print("top:     \(top)")
         }
     }
 

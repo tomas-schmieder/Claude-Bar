@@ -36,4 +36,8 @@ let package = Package(
             name: "ClaudeBarDebug",
             dependencies: ["ClaudeBarCore"],
             path: "Sources/ClaudeBarDebug"),
+        .testTarget(
+            name: "ClaudeBarCoreTests",
+            dependencies: ["ClaudeBarCore"],
+            path: "Tests/ClaudeBarCoreTests"),
     ])

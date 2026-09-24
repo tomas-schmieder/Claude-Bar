@@ -1,41 +1,72 @@
 # ClaudeBar
 
-Thin Claude-only macOS menu-bar app extracted from CodexBar.
+A minimal macOS menu-bar app that tracks your **Claude**, **Codex** and **Cursor** usage in one place,
+inspired by [CodexBar](https://github.com/steipete/CodexBar),
+[claude-usage-bar](https://github.com/mnapoli/claude-usage-bar) and
+[CodexUsageBar](https://github.com/Artzainnn/CodexUsageBar).
+
+For each provider:
+
+- **Plan limits**: session / weekly / monthly bars with reset countdowns and an even-pace marker
+- **Token usage over time**: a labelled daily bar chart (7 / 14 / 30 days), hover a bar for that day's
+  input / output / cache breakdown, toggle between tokens and estimated cost
+- **Estimated spend**: today, 7-day and 30-day cost at public API list prices. You pay a flat subscription;
+  this shows what the same usage would have cost on the pay-as-you-go API.
+
+Left-click the menu-bar icon for the popover, right-click for quick settings. The icon shows two bars
+(top: first limit, bottom: second limit) for the provider you choose under **Menu Bar Shows**.
+
+## Where the data comes from
+
+Everything is read from sign-ins that already exist on your Mac. No API keys, no cookie copying.
+
+| Provider | Limits | Token history + cost |
+|---|---|---|
+| Claude | Claude Code OAuth cache, falling back to the `claude` CLI (never shows Keychain prompts) | Local Claude Code logs in `~/.claude/projects`, priced at Anthropic API rates |
+| Codex | `chatgpt.com/backend-api/wham/usage` using the tokens from `codex login` (`~/.codex/auth.json`); falls back to the last limits written in your session logs | Local Codex CLI logs in `~/.codex/sessions`, priced at OpenAI API rates |
+| Cursor | `cursor.com/api/usage-summary` using the Cursor desktop app's session (`state.vscdb`) | `cursor.com` usage events; cost is Cursor's own per-request API list price (`totalCents`) |
+
+Setup: be signed in to Claude Code (`claude`), the Codex CLI (`codex login`) and the Cursor app.
+Providers you don't use can be switched off from the gear menu.
+
+Notes:
+
+- `$CODEX_HOME` is respected when set in the environment the app launches with.
+- Codex logs are parsed incrementally (only newly appended lines are read on each refresh). Forked or
+  resumed Codex sessions can occasionally be counted twice, so treat Codex totals as estimates.
+- Refreshes run every 5 minutes; token history refreshes every 15 minutes or when you click refresh.
 
 ## Layout
 
-- `Sources/ClaudeBarCore` — Claude usage fetch (OAuth / Web / CLI) + shared helpers
-- `Sources/ClaudeBar` — menu-bar app (`NSStatusItem`)
-- `Sources/ClaudeBarDebug` — one-shot CLI that prints a usage snapshot
-- `ClaudeBar.app` — packaged macOS application (created by `Scripts/package_app.sh`)
-- `REFERENCE.md` — freeze tip of the CodexBar strip branch this was cut from
+- `Sources/ClaudeBarCore`: provider fetchers and shared helpers
+  - `MultiProvider/`: provider-neutral limits (`ProviderLimitSnapshot`) and daily token history (`TokenUsageHistory`)
+  - `Providers/Claude`, `Providers/Codex`, `Providers/Cursor`
+- `Sources/ClaudeBar`: the menu-bar app (`NSStatusItem` + SwiftUI popover with Swift Charts)
+- `Sources/ClaudeBarDebug`: one-shot CLI that prints every provider's limits and token totals
+- `Tests/ClaudeBarCoreTests`: parser tests (Codex logs, Cursor responses, history math)
 
-## Build / run (real macOS app)
+## Build / run
 
-Requires Xcode’s Swift toolchain:
+Requires Xcode 26 (Swift 6.2) on macOS 14+.
 
 ```bash
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
-cd /Users/windy/claude-bar/ClaudeBar
 
-# Build ClaudeBar.app and open it (no terminal attachment)
+# Build ClaudeBar.app and open it
 ./Scripts/compile_and_run.sh
 
 # Or package then launch separately
 ./Scripts/package_app.sh          # → ClaudeBar.app
 ./Scripts/launch.sh
 
-# Optional: double-click ClaudeBar.app in Finder, or:
-open -n ./ClaudeBar.app
-```
+# Tests
+swift test
 
-`LSUIElement` is set, so it runs as a menu-bar agent (no Dock icon), same idea as CodexBar.
-
-### Debug CLI (still terminal)
-
-```bash
+# Print what each provider reports, from the terminal
 swift run ClaudeBarDebug
 ```
+
+`LSUIElement` is set, so it runs as a menu-bar agent (no Dock icon).
 
 ## Install to Applications (optional)
 
@@ -44,15 +75,3 @@ swift run ClaudeBarDebug
 cp -R ClaudeBar.app /Applications/
 open -a ClaudeBar
 ```
-
-## Scope (MVP)
-
-In:
-- Packaged `.app` bundle (Finder / `open` / Applications)
-- CodexBar-style dual-bar template icon (session + weekly)
-- SwiftUI usage card: paced Session/Weekly bars, Daily Routines extras, cost grid, 30d chart
-- Cache-first launch + OAuth-preferring refresh
-- Local Claude JSONL cost scan in the background
-- Auto refresh every 5 minutes + Refresh action
-
-Deferred: Preferences window, widgets, Sparkle auto-update, Developer ID notarization, custom app icon.
